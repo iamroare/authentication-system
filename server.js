@@ -10,6 +10,14 @@ dotenv.config();
 // Initialize express app
 const app = express();
 
+
+app.get('/', (req, res) => {
+  res.status(200).json({
+    success: true,
+    message: 'Server is running'
+  });
+});
+
 // Middleware
 app.use(express.json({ limit: '50mb' })); // Increased limit for base64 images
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
