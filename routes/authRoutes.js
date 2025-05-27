@@ -40,7 +40,8 @@ const upload = multer({
 });
 
 // Register endpoint now uses multer middleware
-router.post('/register', upload.single('profileImage'), authController.register);
+router.post('/register', upload.single('file'), authController.register);
+router.post('/login',authController.login)
 
 // Other routes remain the same
 router.post('/generateOTP', authController.generateOTP);

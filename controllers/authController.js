@@ -19,82 +19,166 @@ const imageToBase64 = (filePath) => {
 };
 
 // Register a new user
+// const fs = require('fs');
+// const User = require('../models/User');
+// const { errorResponse, successResponse } = require('../utils/response');
+// const { generateOTP, imageToBase64, sendEmailOTP, sendMobileOTP } = require('../utils/helpers');
+
 exports.register = async (req, res) => {
   try {
-    const { email, mobileNumber, password } = req.body;
-    
-    // Check if required fields are provided
-    if (!email || !mobileNumber || !password) {
-      return errorResponse(res, 'Email, mobile number, and password are required');
+    const {
+      email,
+      mobile_number,
+      password,
+      username,
+      profession,
+      company_name,
+      address_line_1,
+      country,
+      state,
+      city,
+      subscription_plan,
+      newsletter
+    } = req.body;
+
+    // Check mandatory fields
+    if (!email || !mobile_number || !password || !username) {
+      return errorResponse(res, 'Email, mobile number, password, and username are required');
     }
-    
-    // Check if image file was uploaded
+
     if (!req.file) {
       return errorResponse(res, 'Profile image is required');
     }
-    
-    // Check if user already exists
+
+    // Check for existing user
     const existingUser = await User.findOne({
-      $or: [{ email }, { mobileNumber }]
+      $or: [{ email }, { mobile_number }]
     });
-    
+
     if (existingUser) {
       if (existingUser.email === email) {
         return errorResponse(res, 'Email already registered');
       }
       return errorResponse(res, 'Mobile number already registered');
     }
-    
-    // Convert uploaded image to base64
-    const profileImage = imageToBase64(req.file.path);
-    
+
+    // Convert image to base64
+    const profile_image = imageToBase64(req.file.path);
+
     // Generate OTPs
-    const emailOTP = generateOTP();
-    const mobileOTP = generateOTP();
-    const otpGeneratedAt = new Date();
-    
-    // Create new user
+    const email_otp = generateOTP();
+    const mobile_otp = generateOTP();
+    const otp_generated_at = new Date();
+
+    // Create user
     const newUser = new User({
       email,
-      mobileNumber,
+      mobile_number,
       password,
-      profileImage, // Now contains the base64 encoded image
-      emailOTP,
-      mobileOTP,
-      otpGeneratedAt
+      username,
+      profile_image,
+      profession,
+      company_name,
+      address_line_1,
+      country,
+      state,
+      city,
+      subscription_plan,
+      newsletter,
+      email_otp,
+      mobile_otp,
+      otp_generated_at
     });
-    
+
     await newUser.save();
-    
-    // Delete the uploaded file after conversion to base64
+
+    // Cleanup image file
     fs.unlinkSync(req.file.path);
-    
-    // Send OTPs (in a real app, you'd integrate with actual email/SMS services)
-    await sendEmailOTP(email, emailOTP);
-    await sendMobileOTP(mobileNumber, mobileOTP);
-    
+
+    // Send OTPs
+    // await sendEmailOTP(email, email_otp);
+    // await sendMobileOTP(mobile_number, mobile_otp);
+
     return successResponse(res, 'User registered successfully', {
-      userId: newUser._id,
+      user_id: newUser._id,
       email: newUser.email,
-      mobileNumber: newUser.mobileNumber,
-      emailOTP, // In a production environment, you would not return OTPs
-      mobileOTP  // This is just for demonstration purposes
+      mobile_number: newUser.mobile_number
     }, 201);
-    
+
   } catch (error) {
-    // If there was an uploaded file, delete it
     if (req.file) {
       try {
         fs.unlinkSync(req.file.path);
-      } catch (unlinkError) {
-        console.error('Error deleting file:', unlinkError);
+      } catch (unlinkErr) {
+        console.error('Error deleting file:', unlinkErr);
       }
     }
-    
+
     console.error('Registration error:', error);
     return errorResponse(res, 'Registration failed: ' + error.message, 500);
   }
 };
+
+
+// const jwt = require('jsonwebtoken');
+// const User = require('../models/User'); // Adjust path as needed
+// const { errorResponse, successResponse } = require('../utils/responseHandler'); // Replace with your actual handler path
+
+exports.login = async (req, res) => {
+  try {
+    const { email, password } = req.body;
+
+    // Check if both fields are provided
+    if (!email || !password) {
+      return errorResponse(res, 'Email and password are required');
+    }
+
+    // Find user by email
+    const user = await User.findOne({ email });
+    if (!user) {
+      return errorResponse(res, 'Invalid email or password');
+    }
+
+    // Compare password
+    const isMatch = await user.comparePassword(password);
+    if (!isMatch) {
+      return errorResponse(res, 'Invalid email or password');
+    }
+
+    // Update last login time
+    user.last_login_at = new Date();
+    await user.save();
+
+    // Generate JWT
+    const tokenPayload = {
+      user_id: user._id,
+      email: user.email,
+      mobile_number: user.mobile_number,
+    };
+
+    // const token = jwt.sign(tokenPayload, process.env.JWT_SECRET, {
+    //   expiresIn: '7d',
+    // });
+
+    const token = generateToken(tokenPayload);
+
+    return successResponse(res, 'Login successful', {
+      token,
+      user: {
+        user_id: user._id,
+        email: user.email,
+        mobile_number: user.mobile_number,
+        profile_image: user.profile_image,
+        subscription_plan: user.subscription_plan
+      }
+    });
+
+  } catch (error) {
+    console.error('Login error:', error);
+    return errorResponse(res, 'Login failed: ' + error.message, 500);
+  }
+};
+
 
 // Generate OTP again
 exports.generateOTP = async (req, res) => {

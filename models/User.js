@@ -10,7 +10,7 @@ const userSchema = new mongoose.Schema({
     lowercase: true,
     match: [/^\w+([.-]?\w+)*@\w+([.-]?\w+)*(\.\w{2,3})+$/, 'Please provide a valid email address']
   },
-  mobileNumber: {
+  mobile_number: {
     type: String,
     required: [true, 'Mobile number is required'],
     unique: true,
@@ -21,51 +21,88 @@ const userSchema = new mongoose.Schema({
     required: [true, 'Password is required'],
     minlength: [6, 'Password must be at least 6 characters long']
   },
-  profileImage: {
-    type: String, // Stored as Base64
+  profile_image: {
+    type: String, // Can store URL or base64 string
     required: [true, 'Profile image is required']
   },
-  emailOTP: {
+  username: {
+    type: String,
+    required: [true, 'Username is required'],
+    trim: true
+  },
+  profession: {
+    type: String,
+    trim: true
+  },
+  company_name: {
+    type: String,
+    trim: true
+  },
+  address_line_1: {
+    type: String,
+    trim: true
+  },
+  country: {
+    type: String,
+    trim: true
+  },
+  state: {
+    type: String,
+    trim: true
+  },
+  city: {
+    type: String,
+    trim: true
+  },
+  subscription_plan: {
+    type: String,
+    enum: ['Free', 'Basic', 'Premium','basic'],
+    default: 'Free'
+  },
+  newsletter: {
+    type: Boolean,
+    default: false
+  },
+  email_otp: {
     type: String,
     default: null
   },
-  mobileOTP: {
+  mobile_otp: {
     type: String,
     default: null
   },
-  otpGeneratedAt: {
+  otp_generated_at: {
     type: Date,
     default: null
   },
-  loginAttempts: {
+  login_attempts: {
     type: Number,
     default: 0
   },
-  lastLoginAt: {
+  last_login_at: {
     type: Date,
     default: null
   },
-  createdAt: {
+  created_at: {
     type: Date,
     default: Date.now
   },
-  updatedAt: {
+  updated_at: {
     type: Date,
     default: Date.now
   }
 });
 
 // Update timestamp before saving
-userSchema.pre('save', function(next) {
-  this.updatedAt = new Date();
+userSchema.pre('save', function (next) {
+  this.updated_at = new Date();
   next();
 });
 
 // Hash password before saving
-userSchema.pre('save', async function(next) {
-  // Only hash the password if it's modified (or new)
+userSchema.pre('save', async function (next) {
   if (!this.isModified('password')) return next();
-  
+
   try {
     const salt = await bcrypt.genSalt(10);
     this.password = await bcrypt.hash(this.password, salt);
@@ -76,32 +113,30 @@ userSchema.pre('save', async function(next) {
 });
 
 // Method to compare password
-userSchema.methods.comparePassword = async function(candidatePassword) {
+userSchema.methods.comparePassword = async function (candidatePassword) {
   return await bcrypt.compare(candidatePassword, this.password);
 };
 
 // Method to verify OTP
-userSchema.methods.verifyOTP = function(type, otp) {
-  // Check if OTP matches and is not expired (5 minutes)
-  const otpField = type === 'email' ? 'emailOTP' : 'mobileOTP';
+userSchema.methods.verifyOTP = function (type, otp) {
+  const otpField = type === 'email' ? 'email_otp' : 'mobile_otp';
   const currentTime = new Date();
-  const otpTime = this.otpGeneratedAt;
-  
+  const otpTime = this.otp_generated_at;
+
   if (!otpTime) {
     return { valid: false, message: 'OTP not generated' };
   }
-  
-  // Calculate difference in minutes
+
   const diffInMinutes = Math.floor((currentTime - otpTime) / (1000 * 60));
-  
+
   if (diffInMinutes > parseInt(process.env.OTP_EXPIRY, 10)) {
     return { valid: false, message: 'OTP expired' };
   }
-  
+
   if (this[otpField] !== otp) {
     return { valid: false, message: 'Invalid OTP' };
   }
-  
+
   return { valid: true, message: 'OTP verified successfully' };
 };
 
